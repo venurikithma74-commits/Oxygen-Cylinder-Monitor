@@ -1,137 +1,455 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Oxygen Cylinder Monitor</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      background: #1a1a1a;
-      color: white;
-      padding-top: 40px;
-    }
-    h1 { font-size: 26px; margin-bottom: 5px; }
-    h2 { font-size: 18px; margin-top: 50px; color: #ccc; }
-    #grid {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 20px;
-      margin-top: 20px;
-    }
-    .card {
-      padding: 25px;
-      border-radius: 16px;
-      min-width: 220px;
-    }
-    .cylinder-name { font-size: 16px; margin-bottom: 8px; opacity: 0.8; }
-    .level { font-size: 30px; font-weight: bold; }
-    .normal { background: #1a7d1a; color: #c8f7c5; }
-    .low { background: #a11a1a; color: #f7c5c5; }
-    .time { font-size: 12px; margin-top: 8px; color: #ccc; }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Oxygen Cylinder Monitor</title>
+<style>
+  :root {
+    --navy: #0b2545;
+    --navy-2: #123a63;
+    --teal: #065a82;
+    --teal-l: #1c7293;
+    --ice: #cadcfc;
+    --white: #ffffff;
+    --offwhite: #f4f7fa;
+    --border: #e2e8ee;
+    --text: #1a2b3c;
+    --muted: #5b6b7b;
+    --green: #1a7d1a;
+    --green-bg: #e4f3e4;
+    --red: #a11a1a;
+    --red-bg: #f8e6e6;
+    --gold: #e8a33d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Calibri, Arial, sans-serif;
+    background: var(--offwhite);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+  }
 
-    table {
-      margin: 20px auto;
-      border-collapse: collapse;
-      width: 90%;
-      max-width: 700px;
-    }
-    th, td {
-      padding: 8px 12px;
-      border-bottom: 1px solid #333;
-      font-size: 14px;
-    }
-    th { color: #999; }
-    .status-low { color: #ff7b7b; font-weight: bold; }
-    .status-normal { color: #7bff8f; }
-  </style>
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    width: 230px;
+    flex-shrink: 0;
+    background: var(--navy);
+    color: var(--ice);
+    display: flex;
+    flex-direction: column;
+    padding: 24px 16px;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 8px 24px 8px;
+    font-weight: bold;
+    font-size: 16px;
+    color: var(--white);
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    margin-bottom: 18px;
+  }
+  .brand .icon { font-size: 22px; }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14.5px;
+    margin-bottom: 4px;
+    color: var(--ice);
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.08); }
+  .nav-item.active { background: var(--teal-l); color: var(--white); font-weight: bold; }
+  .nav-item .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: 0.5; }
+  .nav-item.active .dot { opacity: 1; background: var(--gold); }
+  .sidebar-footer {
+    margin-top: auto;
+    font-size: 11px;
+    color: rgba(202,220,252,0.6);
+    padding: 10px 8px 0 8px;
+    border-top: 1px solid rgba(255,255,255,0.12);
+  }
+
+  /* ---------- Main area ---------- */
+  .main {
+    margin-left: 230px;
+    flex: 1;
+    padding: 32px 40px;
+    max-width: 1100px;
+  }
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 28px;
+  }
+  .page-title { font-size: 26px; font-weight: bold; margin: 0; }
+  .page-sub { color: var(--muted); font-size: 13.5px; margin-top: 4px; }
+  .live-pill {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 12.5px; color: var(--muted);
+    background: var(--white); border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 20px;
+  }
+  .live-pill .blip { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ---------- Cards (Dashboard) ---------- */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 34px;
+  }
+  .card {
+    padding: 22px;
+    border-radius: 14px;
+    color: var(--white);
+  }
+  .card.normal { background: var(--green); }
+  .card.low { background: var(--red); }
+  .card .cyl-name { font-size: 13.5px; opacity: 0.85; margin-bottom: 6px; }
+  .card .cyl-level { font-size: 26px; font-weight: bold; }
+  .card .cyl-time { font-size: 11.5px; margin-top: 8px; opacity: 0.85; }
+
+  .panel {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 24px;
+  }
+  .panel h3 { margin: 0 0 14px 0; font-size: 15px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 9px 10px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .status-low { color: var(--red); font-weight: bold; }
+  .status-normal { color: var(--green); font-weight: bold; }
+
+  /* ---------- History page controls ---------- */
+  .controls { display: flex; gap: 12px; margin-bottom: 18px; align-items: center; }
+  select, .btn {
+    padding: 9px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--white); font-size: 13.5px; color: var(--text); cursor: pointer;
+    font-family: inherit;
+  }
+  .btn.primary { background: var(--teal-l); color: var(--white); border: none; font-weight: bold; }
+  .btn.primary:hover { background: var(--teal); }
+
+  /* ---------- Settings page ---------- */
+  .setting-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 18px 0; border-bottom: 1px solid var(--border);
+  }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-label { font-size: 14.5px; font-weight: bold; }
+  .setting-desc { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+
+  .switch { position: relative; width: 46px; height: 26px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider-toggle {
+    position: absolute; cursor: pointer; inset: 0;
+    background: #c7cfd7; border-radius: 26px; transition: 0.2s;
+  }
+  .slider-toggle:before {
+    content: ""; position: absolute; height: 20px; width: 20px; left: 3px; top: 3px;
+    background: white; border-radius: 50%; transition: 0.2s;
+  }
+  input:checked + .slider-toggle { background: var(--green); }
+  input:checked + .slider-toggle:before { transform: translateX(20px); }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+</style>
 </head>
 <body>
-  <h1>🫁 Oxygen Cylinder Level Monitor</h1>
-  <div id="grid">Loading...</div>
 
-  <h2>Recent Updates</h2>
-  <table id="updatesTable">
-    <thead>
-      <tr><th>Cylinder</th><th>Level</th><th>Status</th><th>Time</th></tr>
-    </thead>
-    <tbody id="updatesBody"></tbody>
-  </table>
+  <div class="sidebar">
+    <div class="brand"><span class="icon">🫁</span> Oxygen Monitor</div>
+    <div class="nav-item active" data-page="dashboard"><span class="dot"></span> Dashboard</div>
+    <div class="nav-item" data-page="history"><span class="dot"></span> History</div>
+    <div class="nav-item" data-page="settings"><span class="dot"></span> Settings</div>
+    <div class="sidebar-footer">Suwa Setha Hospital<br/>Unit 47 · Emerging Technologies</div>
+  </div>
 
-  <script>
-    const SUPABASE_URL = "https://snpftwdqduxefnjqkgxn.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_dCH1kFuZAmz_MB-9U5sidw_EWpH2xUh";
+  <div class="main">
 
-    // Ask permission for browser notifications
-    if ("Notification" in window && Notification.permission !== "granted") {
-      Notification.requestPermission();
-    }
+    <!-- DASHBOARD PAGE -->
+    <div class="page active" id="page-dashboard">
+      <div class="topbar">
+        <div>
+          <p class="page-title">Dashboard</p>
+          <p class="page-sub">Live status of every connected cylinder</p>
+        </div>
+        <div class="live-pill"><span class="blip"></span> <span id="lastRefresh">Connecting…</span></div>
+      </div>
+      <div class="grid" id="dashGrid"><div class="empty-state">Loading cylinders…</div></div>
+      <div class="panel">
+        <h3>Recent Activity</h3>
+        <table>
+          <thead><tr><th>Cylinder</th><th>Level</th><th>Status</th><th>Time</th></tr></thead>
+          <tbody id="recentBody"></tbody>
+        </table>
+      </div>
+    </div>
 
-    // Track which cylinders were already low, so we don't spam notifications every 5s
-    const alreadyNotifiedLow = new Set();
+    <!-- HISTORY PAGE -->
+    <div class="page" id="page-history">
+      <div class="topbar">
+        <div>
+          <p class="page-title">History</p>
+          <p class="page-sub">Full log of readings received from all cylinders</p>
+        </div>
+      </div>
+      <div class="controls">
+        <select id="cylinderFilter">
+          <option value="all">All cylinders</option>
+        </select>
+        <select id="statusFilter">
+          <option value="all">All statuses</option>
+          <option value="normal">Normal only</option>
+          <option value="low">Low only</option>
+        </select>
+        <button class="btn" id="refreshHistoryBtn">Refresh now</button>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Cylinder</th><th>Level</th><th>Status</th><th>Time</th></tr></thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+    </div>
 
-    async function fetchLatest() {
-      try {
-        const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/oxygen_readings?order=created_at.desc&limit=50`,
-          { headers: { apikey: SUPABASE_KEY } } }
-        );
-        const data = await res.json();
+    <!-- SETTINGS PAGE -->
+    <div class="page" id="page-settings">
+      <div class="topbar">
+        <div>
+          <p class="page-title">Settings</p>
+          <p class="page-sub">Control how this dashboard behaves on this device</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Low-oxygen notifications</div>
+            <div class="setting-desc">Show a browser popup the moment any cylinder drops to a low level</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="notifToggle" checked>
+            <span class="slider-toggle"></span>
+          </label>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Auto-refresh speed</div>
+            <div class="setting-desc">How often the dashboard checks Supabase for new readings</div>
+          </div>
+          <select id="refreshSpeed">
+            <option value="5000">Every 5 seconds</option>
+            <option value="10000">Every 10 seconds</option>
+            <option value="30000">Every 30 seconds</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Send a test notification</div>
+            <div class="setting-desc">Check that browser notifications are working on this device</div>
+          </div>
+          <button class="btn primary" id="testNotifBtn">Send test</button>
+        </div>
+      </div>
+    </div>
 
-        // ---- Cards: latest reading per cylinder ----
-        const latestByCylinder = {};
-        for (const row of data) {
-          const id = row.cylinder_id || "Cylinder-1";
-          if (!latestByCylinder[id]) latestByCylinder[id] = row;
-        }
+  </div>
 
-        const grid = document.getElementById("grid");
-        grid.innerHTML = "";
-        Object.entries(latestByCylinder).forEach(([id, reading]) => {
-          const isLow = reading.status === "low";
-          const card = document.createElement("div");
-          card.className = "card " + (isLow ? "low" : "normal");
-          card.innerHTML = `
-            <div class="cylinder-name">${id}</div>
-            <div class="level">${reading.level} (${reading.status.toUpperCase()})</div>
-            <div class="time">Updated: ${new Date(reading.created_at).toLocaleTimeString()}</div>
-          `;
-          grid.appendChild(card);
+<script>
+  const SUPABASE_URL = "https://snpftwdqduxefnjqkgxn.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_dCH1kFuZAmz_MB-9U5sidw_EWpH2xUh";
+  const HEADERS = { apikey: SUPABASE_KEY };
 
-          // ---- Notification logic ----
-          if (isLow && !alreadyNotifiedLow.has(id)) {
-            alreadyNotifiedLow.add(id);
-            if ("Notification" in window && Notification.permission === "granted") {
-              new Notification("⚠️ Low Oxygen Warning", {
-                body: `${id} has dropped to a low level (${reading.level})!`
-              });
-            }
-          } else if (!isLow && alreadyNotifiedLow.has(id)) {
-            alreadyNotifiedLow.delete(id); // reset so it can alert again next time it goes low
-          }
+  // ---------- Navigation ----------
+  document.querySelectorAll(".nav-item").forEach(item => {
+    item.addEventListener("click", () => {
+      document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+      document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+      item.classList.add("active");
+      document.getElementById("page-" + item.dataset.page).classList.add("active");
+      if (item.dataset.page === "history") loadHistory();
+    });
+  });
+
+  // ---------- Settings (persisted in this browser) ----------
+  const settings = {
+    notif: localStorage.getItem("oxy_notif") !== "false",
+    refresh: parseInt(localStorage.getItem("oxy_refresh") || "5000"),
+  };
+  document.getElementById("notifToggle").checked = settings.notif;
+  document.getElementById("refreshSpeed").value = String(settings.refresh);
+
+  document.getElementById("notifToggle").addEventListener("change", (e) => {
+    settings.notif = e.target.checked;
+    localStorage.setItem("oxy_notif", settings.notif);
+  });
+  document.getElementById("refreshSpeed").addEventListener("change", (e) => {
+    settings.refresh = parseInt(e.target.value);
+    localStorage.setItem("oxy_refresh", settings.refresh);
+    clearInterval(refreshTimer);
+    refreshTimer = setInterval(fetchDashboard, settings.refresh);
+  });
+  document.getElementById("testNotifBtn").addEventListener("click", () => {
+    if ("Notification" in window) {
+      if (Notification.permission === "granted") {
+        new Notification("🔔 Test Notification", { body: "This is what a low-oxygen alert will look like." });
+      } else {
+        Notification.requestPermission().then(p => {
+          if (p === "granted") new Notification("🔔 Test Notification", { body: "Notifications are now enabled." });
         });
-
-        // ---- Recent updates table: last 10 readings overall ----
-        const tbody = document.getElementById("updatesBody");
-        tbody.innerHTML = "";
-        data.slice(0, 10).forEach(row => {
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td>${row.cylinder_id || "Cylinder-1"}</td>
-            <td>${row.level}</td>
-            <td class="status-${row.status}">${row.status.toUpperCase()}</td>
-            <td>${new Date(row.created_at).toLocaleTimeString()}</td>
-          `;
-          tbody.appendChild(tr);
-        });
-
-      } catch (err) {
-        document.getElementById("grid").textContent = "Connection error";
       }
     }
+  });
 
-    fetchLatest();
-    setInterval(fetchLatest, 5000);
-  </script>
+  if ("Notification" in window && Notification.permission !== "granted") {
+    Notification.requestPermission();
+  }
+
+  const alreadyNotifiedLow = new Set();
+
+  // ---------- Dashboard ----------
+  async function fetchDashboard() {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/oxygen_readings?order=created_at.desc&limit=50`,
+        { headers: HEADERS }
+      );
+      const data = await res.json();
+
+      const latestByCylinder = {};
+      for (const row of data) {
+        const id = row.cylinder_id || "Cylinder-1";
+        if (!latestByCylinder[id]) latestByCylinder[id] = row;
+      }
+
+      const grid = document.getElementById("dashGrid");
+      grid.innerHTML = "";
+      Object.entries(latestByCylinder).sort(([a],[b]) => a.localeCompare(b)).forEach(([id, reading]) => {
+        const isLow = reading.status === "low";
+        const card = document.createElement("div");
+        card.className = "card " + (isLow ? "low" : "normal");
+        card.innerHTML = `
+          <div class="cyl-name">${id}</div>
+          <div class="cyl-level">${reading.level} (${reading.status.toUpperCase()})</div>
+          <div class="cyl-time">Updated: ${new Date(reading.created_at).toLocaleTimeString()}</div>
+        `;
+        grid.appendChild(card);
+
+        if (isLow && !alreadyNotifiedLow.has(id)) {
+          alreadyNotifiedLow.add(id);
+          if (settings.notif && "Notification" in window && Notification.permission === "granted") {
+            new Notification("⚠️ Low Oxygen Warning", { body: `${id} has dropped to a low level (${reading.level})!` });
+          }
+        } else if (!isLow && alreadyNotifiedLow.has(id)) {
+          alreadyNotifiedLow.delete(id);
+        }
+      });
+
+      const recentBody = document.getElementById("recentBody");
+      recentBody.innerHTML = "";
+      data.slice(0, 5).forEach(row => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${row.cylinder_id || "Cylinder-1"}</td>
+          <td>${row.level}</td>
+          <td class="status-${row.status}">${row.status.toUpperCase()}</td>
+          <td>${new Date(row.created_at).toLocaleTimeString()}</td>
+        `;
+        recentBody.appendChild(tr);
+      });
+
+      document.getElementById("lastRefresh").textContent = "Live · " + new Date().toLocaleTimeString();
+      populateCylinderFilter(data);
+    } catch (err) {
+      document.getElementById("dashGrid").innerHTML = '<div class="empty-state">Connection error — check your internet or Supabase settings.</div>';
+      document.getElementById("lastRefresh").textContent = "Connection error";
+    }
+  }
+
+  // ---------- History ----------
+  function populateCylinderFilter(data) {
+    const select = document.getElementById("cylinderFilter");
+    const existing = new Set(Array.from(select.options).map(o => o.value));
+    const ids = [...new Set(data.map(r => r.cylinder_id || "Cylinder-1"))].sort();
+    ids.forEach(id => {
+      if (!existing.has(id)) {
+        const opt = document.createElement("option");
+        opt.value = id; opt.textContent = id;
+        select.appendChild(opt);
+      }
+    });
+  }
+
+  async function loadHistory() {
+    const tbody = document.getElementById("historyBody");
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Loading…</td></tr>';
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/oxygen_readings?order=created_at.desc&limit=100`,
+        { headers: HEADERS }
+      );
+      const data = await res.json();
+      renderHistory(data);
+      window._historyData = data;
+    } catch (err) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Connection error.</td></tr>';
+    }
+  }
+
+  function renderHistory(data) {
+    const cylFilter = document.getElementById("cylinderFilter").value;
+    const statFilter = document.getElementById("statusFilter").value;
+    const filtered = data.filter(r => {
+      const id = r.cylinder_id || "Cylinder-1";
+      if (cylFilter !== "all" && id !== cylFilter) return false;
+      if (statFilter !== "all" && r.status !== statFilter) return false;
+      return true;
+    });
+    const tbody = document.getElementById("historyBody");
+    tbody.innerHTML = "";
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No readings match this filter.</td></tr>';
+      return;
+    }
+    filtered.forEach(row => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${row.cylinder_id || "Cylinder-1"}</td>
+        <td>${row.level}</td>
+        <td class="status-${row.status}">${row.status.toUpperCase()}</td>
+        <td>${new Date(row.created_at).toLocaleString()}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById("cylinderFilter").addEventListener("change", () => renderHistory(window._historyData || []));
+  document.getElementById("statusFilter").addEventListener("change", () => renderHistory(window._historyData || []));
+  document.getElementById("refreshHistoryBtn").addEventListener("click", loadHistory);
+
+  // ---------- Boot ----------
+  let refreshTimer = setInterval(fetchDashboard, settings.refresh);
+  fetchDashboard();
+</script>
 </body>
 </html>
