@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Oxygen Cylinder Monitor</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0b2545" />
 <style>
   :root {
     --navy: #0b2545;
@@ -312,7 +314,7 @@
             <div class="setting-row">
               <div>
                 <div class="setting-label">Low-oxygen notifications</div>
-                <div class="setting-desc">Show a browser popup the moment any cylinder drops to a low level</div>
+                <div class="setting-desc">Send an app notification to this device the moment any cylinder drops to a low level</div>
               </div>
               <label class="switch">
                 <input type="checkbox" id="notifToggle" checked>
@@ -347,6 +349,20 @@
 <script>
   const SUPABASE_URL = "https://snpftwdqduxefnjqkgxn.supabase.co";
   const SUPABASE_KEY = "sb_publishable_dCH1kFuZAmz_MB-9U5sidw_EWpH2xUh";
+  let swRegistration = null;
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js")
+    .then((reg) => { swRegistration = reg; })
+    .catch((err) => console.error("Service worker registration failed:", err));
+}
+
+function sendAppNotification(title, body, tag) {
+  if (swRegistration && swRegistration.active) {
+    swRegistration.active.postMessage({ type: "SHOW_NOTIFICATION", title, body, tag });
+  } else if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(title, { body });
+  }
+}
 
   // ============ AUTH ============
   function getSession() {
@@ -453,10 +469,10 @@
       document.getElementById("testNotifBtn").addEventListener("click", () => {
         if ("Notification" in window) {
           if (Notification.permission === "granted") {
-            new Notification("🔔 Test Notification", { body: "This is what a low-oxygen alert will look like." });
+            sendAppNotification("🔔 Test Notification", "This is what a low-oxygen app notification will look like.", "test");
           } else {
             Notification.requestPermission().then(p => {
-              if (p === "granted") new Notification("🔔 Test Notification", { body: "Notifications are now enabled." });
+              if (p === "granted") sendAppNotification("🔔 Test Notification", "App notifications are now enabled.", "test");
             });
           }
         }
@@ -508,7 +524,7 @@
         if (isLow && !alreadyNotifiedLow.has(id)) {
           alreadyNotifiedLow.add(id);
           if (window._appSettings.notif && "Notification" in window && Notification.permission === "granted") {
-            new Notification("⚠️ Low Oxygen Warning", { body: `${id} has dropped to a low level (${reading.level})!` });
+            sendAppNotification("⚠️ Low Oxygen Warning", `${id} has dropped to a low level (${reading.level})!`, "oxygen-alert-" + id);S
           }
         } else if (!isLow && alreadyNotifiedLow.has(id)) {
           alreadyNotifiedLow.delete(id);
