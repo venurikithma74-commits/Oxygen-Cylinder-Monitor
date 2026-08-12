@@ -434,8 +434,8 @@ function sendAppNotification(title, body, tag) {
 
   // ============ APP (only runs after login) ============
   const HEADERS = { apikey: SUPABASE_KEY };
-  let refreshTimer = null;
-  let bootedNav = false;
+  var refreshTimer = null;
+  var bootedNav = false;
 
   function bootDashboard() {
     if (!bootedNav) {
