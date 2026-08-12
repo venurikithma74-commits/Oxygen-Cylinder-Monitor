@@ -563,7 +563,7 @@ async function acknowledgeReading(readingId, btnEl) {
 
     clearInterval(refreshTimer);
     refreshTimer = setInterval(fetchDashboard, window._appSettings.refresh);
-    fetchDashboard();
+    loadThresholds().then(fetchDashboard);
   }
 
   const alreadyNotifiedLow = new Set();
@@ -585,20 +585,38 @@ async function acknowledgeReading(readingId, btnEl) {
       const grid = document.getElementById("dashGrid");
       grid.innerHTML = "";
       Object.entries(latestByCylinder).sort(([a],[b]) => a.localeCompare(b)).forEach(([id, reading]) => {
-        const isLow = reading.status === "low";
+        const threshold = getThreshold(id);
+        const isLow = reading.level < threshold;
+        const statusLabel = isLow ? "LOW" : "NORMAL";
         const card = document.createElement("div");
         card.className = "card " + (isLow ? "low" : "normal");
+
+        let extraHtml = "";
+        if (isLow) {
+          if (reading.acknowledged) {
+            extraHtml = `<div class="ack-badge">✓ Acknowledged ${new Date(reading.acknowledged_at).toLocaleTimeString()}</div>`;
+          } else {
+            extraHtml = `<button class="ack-btn" data-id="${reading.id}">Acknowledge</button>`;
+          }
+        }
+
         card.innerHTML = `
           <div class="cyl-name">${id}</div>
-          <div class="cyl-level">${reading.level} (${reading.status.toUpperCase()})</div>
-          <div class="cyl-time">Updated: ${new Date(reading.created_at).toLocaleTimeString()}</div>
+          <div class="cyl-level">${reading.level} (${statusLabel})</div>
+          <div class="cyl-time">Updated: ${new Date(reading.created_at).toLocaleTimeString()} · Threshold: ${threshold}</div>
+          ${extraHtml}
         `;
         grid.appendChild(card);
+
+        const ackBtn = card.querySelector(".ack-btn");
+        if (ackBtn) {
+          ackBtn.addEventListener("click", () => acknowledgeReading(ackBtn.dataset.id, ackBtn));
+        }
 
         if (isLow && !alreadyNotifiedLow.has(id)) {
           alreadyNotifiedLow.add(id);
           if (window._appSettings.notif && "Notification" in window && Notification.permission === "granted") {
-            sendAppNotification("⚠️ Low Oxygen Warning", `${id} has dropped to a low level (${reading.level})!`, "oxygen-alert-" + id);S
+            sendAppNotification("⚠️ Low Oxygen Warning", `${id} has dropped below ${threshold} (currently ${reading.level})!`, "oxygen-alert-" + id);
           }
         } else if (!isLow && alreadyNotifiedLow.has(id)) {
           alreadyNotifiedLow.delete(id);
@@ -620,12 +638,32 @@ async function acknowledgeReading(readingId, btnEl) {
 
       document.getElementById("lastRefresh").textContent = "Live · " + new Date().toLocaleTimeString();
       populateCylinderFilter(data);
+      renderThresholdList(Object.keys(latestByCylinder).sort());
     } catch (err) {
       document.getElementById("dashGrid").innerHTML = '<div class="empty-state">Connection error — check your internet or Supabase settings.</div>';
       document.getElementById("lastRefresh").textContent = "Connection error";
     }
   }
 
+  function renderThresholdList(cylinderIds) {
+    const container = document.getElementById("thresholdList");
+    if (!container) return;
+    container.innerHTML = "";
+    cylinderIds.forEach(id => {
+      const row = document.createElement("div");
+      row.className = "threshold-row";
+      row.innerHTML = `
+        <div class="setting-label" style="font-weight:normal;">${id}</div>
+        <input type="number" value="${getThreshold(id)}" data-id="${id}" />
+      `;
+      const input = row.querySelector("input");
+      input.addEventListener("change", () => {
+        saveThreshold(id, parseInt(input.value));
+      });
+      container.appendChild(row);
+    });
+  }
+  
   function populateCylinderFilter(data) {
     const select = document.getElementById("cylinderFilter");
     const existing = new Set(Array.from(select.options).map(o => o.value));
